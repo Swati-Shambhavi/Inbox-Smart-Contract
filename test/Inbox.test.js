@@ -1,11 +1,8 @@
-// contract test code will go here
 const assert = require('assert');
 const ganache = require('ganache-cli');
-//Web3 is in uppercase because whenever we are going to make use of Web3 we always going to importing a constructor function(going to use instances of Web3 library).
-const Web3 = require('web3');
+const { interface, bytecode } = require('../compile');
 
-//We use Web3 constructor to make instances of web3 library. We can make multiple instances inside 1 project. the purpose of each instance is to connect with different Ethereum network
-//It is not common to access multiple networks from 1 application, genrally we will only work with 1 instance of Web3 at a time
+const Web3 = require('web3');
 
 //How the below code works?
 //We use Web3 to make instance of web3. Immediately after doing so, we have to do some configuration of the new instance that we have created. We have to something called "PROVIDER"
@@ -24,13 +21,35 @@ const web3 = new Web3(ganache.provider());
 
 Explained better in notes.
  */
-
-beforeEach(() => {
+let accounts;
+let inbox;
+const DEFAULT_MESSAGE = 'Hi there!';
+beforeEach(async () => {
   //Get a list of all accounts
-  web3.eth.getAccounts().then((fetchedAccounts) => {
-    console.log(fetchedAccounts);
-  });
+  accounts = await web3.eth.getAccounts();
+  //use one of those accounts to deploy the contract
+  //explained in notes
+  inbox = await new web3.eth.Contract(JSON.parse(interface))
+    .deploy({
+      data: bytecode,
+      arguments: [DEFAULT_MESSAGE],
+    })
+    .send({ from: accounts[0], gas: '1000000' });
 });
 describe('Inbox', () => {
-  it('deploys a contract', () => {});
+  it('deploys a contract', () => {
+    //first test to check if our contract has been successfully deployed in the ethereum network(ganache in this case) or not.
+    //we will do that by check if the inbox reference has a valid address (address where our contract got deployed) or not
+    assert.ok(inbox.options.address);
+  });
+  it('has a default message', async () => {
+    const message = await inbox.methods.message().call();
+    assert.equal(message, DEFAULT_MESSAGE);
+  });
+
+  it('can set new message', async () => {
+    await inbox.methods.setMessage('Bye there!').send({ from: accounts[0] });
+    const message = await inbox.methods.message().call();
+    assert.equal(message, 'Bye there!');
+  });
 });
